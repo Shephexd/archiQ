@@ -4,6 +4,7 @@ from middleware.amazon_q_hook import AmazonQDeveloperHook
 import json
 import sys
 import os
+import shutil
 from datetime import datetime
 
 
@@ -11,9 +12,35 @@ class ArchiQCLI:
     def __init__(self):
         self.q_hook = AmazonQDeveloperHook()
         self.default_region = 'ap-northeast-2'  # Seoul region as default
+        
+        # Get terminal size for better formatting
+        self.terminal_width = shutil.get_terminal_size().columns
+        self.max_width = min(120, self.terminal_width - 4)  # Leave some margin
 
         # Load prompts for core functions only
         self.prompts = self._load_prompts()
+
+    def _clear_screen(self):
+        """Clear screen and reset cursor position"""
+        os.system('clear' if os.name == 'posix' else 'cls')
+    
+    def _print_header(self, title):
+        """Print formatted header"""
+        print("\n" + "=" * self.max_width)
+        print(f"🚀 {title}".center(self.max_width))
+        print("=" * self.max_width)
+    
+    def _print_separator(self, char="-"):
+        """Print separator line"""
+        print(char * self.max_width)
+    
+    def _wrap_text(self, text, width=None):
+        """Wrap text to fit terminal width"""
+        if width is None:
+            width = self.max_width
+        
+        import textwrap
+        return textwrap.fill(text, width=width)
 
     def _load_prompts(self):
         """Load core prompt templates"""
@@ -98,55 +125,82 @@ class ArchiQCLI:
         return answers['region'] if answers else self.default_region
 
     def _execute_review(self, question, title):
-        """Execute review and save results - enhanced with spinner and progress tracking"""
-        print(f"\n🚀 {title} 생성을 시작합니다...")
-        print("=" * 80)
-
+        """Execute review and save results - enhanced with better formatting and progress tracking"""
+        self._clear_screen()
+        self._print_header(title)
+        
         full_response = ""
         start_time = datetime.now()
-
+        
         try:
             line_count = 0
+            char_count = 0
             last_progress_time = start_time
-            thinking_detected = False
-
-            print("📡 Amazon Q Developer에 연결 중...")
-
+            
+            print(f"📡 Amazon Q Developer에 연결 중...")
+            print(f"💭 질문 처리 중: {question[:100]}...")
+            self._print_separator()
+            
+            # Buffer for collecting output
+            output_buffer = []
+            buffer_size = 50  # Lines to buffer before displaying
+            
             for line in self.q_hook.ask_question_stream(question):
                 current_time = datetime.now()
                 elapsed = (current_time - start_time).total_seconds()
-
-                # Check if this looks like a thinking phase is over
-                if not thinking_detected and line_count == 0 and len(line.strip()) > 20:
-                    print("✨ 분석 완료! 응답을 생성하고 있습니다...")
-                    thinking_detected = True
-
-                # Print the actual response line
-                print(line, flush=True)
-                full_response += line + "\n"
-                line_count += 1
-
-                # Show progress every 30 seconds or 100 lines
-                if (current_time - last_progress_time).total_seconds() > 60 or line_count % 100 == 0:
-                    print(f"\n📊 [진행상황] {line_count}줄 처리됨 | 경과시간: {elapsed:.1f}초")
-                    print("-" * 40)
-                    last_progress_time = current_time
-
+                
+                # Clean and format the line
+                clean_line = line.strip()
+                if not clean_line:
+                    continue
+                
+                # Wrap long lines to fit terminal
+                wrapped_lines = self._wrap_text(clean_line).split('\n')
+                
+                for wrapped_line in wrapped_lines:
+                    output_buffer.append(wrapped_line)
+                    full_response += wrapped_line + "\n"
+                    line_count += 1
+                    char_count += len(wrapped_line)
+                
+                # Display buffer when it's full or show progress
+                if len(output_buffer) >= buffer_size or (current_time - last_progress_time).total_seconds() > 30:
+                    # Display buffered content
+                    for buffered_line in output_buffer:
+                        print(buffered_line)
+                    output_buffer.clear()
+                    
+                    # Show progress
+                    if (current_time - last_progress_time).total_seconds() > 30:
+                        self._print_separator("·")
+                        progress_msg = f"📊 진행상황: {line_count}줄 ({char_count:,}자) | 경과시간: {elapsed:.1f}초"
+                        print(self._wrap_text(progress_msg))
+                        self._print_separator("·")
+                        last_progress_time = current_time
+            
+            # Display remaining buffer
+            for buffered_line in output_buffer:
+                print(buffered_line)
+            
         except KeyboardInterrupt:
             print(f"\n⚠️ 사용자에 의해 중단되었습니다.")
+            input("\n계속하려면 Enter를 누르세요...")
             return
         except Exception as e:
             print(f"\n❌ 오류 발생: {str(e)}")
             print("🔄 잠시 후 다시 시도해주세요.")
+            input("\n계속하려면 Enter를 누르세요...")
             return
 
         total_time = (datetime.now() - start_time).total_seconds()
-        print("=" * 80)
-        print(f"✅ {title} 완료!")
-        print(f"📊 총 {line_count}줄 처리 | 소요시간: {total_time:.1f}초")
-
-        # Save to file if response is substantial
-        print(full_response.strip())
+        
+        self._print_separator()
+        completion_msg = f"✅ {title} 완료! | 총 {line_count}줄 ({char_count:,}자) | 소요시간: {total_time:.1f}초"
+        print(self._wrap_text(completion_msg))
+        self._print_separator()
+        
+        # Pause before returning to menu
+        input("\n메뉴로 돌아가려면 Enter를 누르세요...")
 
     def _get_filename(self, title):
         """Generate filename from title"""
@@ -160,9 +214,17 @@ class ArchiQCLI:
     def main_menu(self):
         """Display the main menu and handle user input"""
         while True:
+            self._clear_screen()
+            
+            # Display welcome header
+            print("\n" + "🏗️  ArchiQ - AWS 아키텍처 리뷰 도구".center(self.max_width))
+            print("=" * self.max_width)
+            print("AWS 아키텍처를 분석하고 개선 방안을 제시합니다".center(self.max_width))
+            print("=" * self.max_width)
+            
             questions = [
                 inquirer.List('action',
-                              message="ArchiQ - AWS 아키텍처 리뷰 도구를 선택하세요:",
+                              message="원하는 기능을 선택하세요:",
                               choices=[
                                   ('1. Service Screener 결과 기반 Well-Architected Review', 'service_screener'),
                                   ('2. 사용중인 AWS 리소스 기반 보안 점검', 'security_check'),
@@ -172,22 +234,34 @@ class ArchiQCLI:
                               ])
             ]
 
-            answers = inquirer.prompt(questions)
+            try:
+                answers = inquirer.prompt(questions)
+                
+                if not answers:
+                    break
 
-            if not answers:
+                if answers['action'] == 'service_screener':
+                    self.service_screener_review()
+                elif answers['action'] == 'security_check':
+                    self.security_check_review()
+                elif answers['action'] == 'well_architected':
+                    self.well_architected_review()
+                elif answers['action'] == 'architecture_diagram':
+                    self.architecture_diagram_review()
+                elif answers['action'] == 'exit':
+                    self._clear_screen()
+                    print("\n" + "감사합니다! 안녕히 가세요! 👋".center(self.max_width))
+                    print("=" * self.max_width)
+                    break
+                    
+            except KeyboardInterrupt:
+                self._clear_screen()
+                print("\n" + "프로그램을 종료합니다! 👋".center(self.max_width))
                 break
-
-            if answers['action'] == 'service_screener':
-                self.service_screener_review()
-            elif answers['action'] == 'security_check':
-                self.security_check_review()
-            elif answers['action'] == 'well_architected':
-                self.well_architected_review()
-            elif answers['action'] == 'architecture_diagram':
-                self.architecture_diagram_review()
-            elif answers['action'] == 'exit':
-                print("\n안녕히 가세요!")
-                break
+            except Exception as e:
+                print(f"\n❌ 메뉴 처리 중 오류 발생: {str(e)}")
+                input("계속하려면 Enter를 누르세요...")
+                continue
 
 
 def main():

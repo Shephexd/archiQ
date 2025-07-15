@@ -12,7 +12,7 @@ import itertools
 
 class SpinnerManager:
     """
-    Spinner manager for showing progress during thinking
+    Improved spinner manager with better output handling
     """
     
     def __init__(self):
@@ -20,6 +20,7 @@ class SpinnerManager:
         self.is_spinning = False
         self.spinner_thread = None
         self.current_message = ""
+        self.last_spinner_length = 0
     
     def start(self, message="🤔 Thinking"):
         """Start spinner with message"""
@@ -32,23 +33,30 @@ class SpinnerManager:
         self.spinner_thread.start()
     
     def stop(self):
-        """Stop spinner"""
+        """Stop spinner and clear line"""
         if not self.is_spinning:
             return
             
         self.is_spinning = False
         if self.spinner_thread:
-            self.spinner_thread.join(timeout=1)
+            self.spinner_thread.join(timeout=0.5)
         
-        # Clear the spinner line
-        print(f"\r{' ' * (len(self.current_message) + 10)}\r", end='', flush=True)
+        # Clear the spinner line completely
+        if self.last_spinner_length > 0:
+            print(f"\r{' ' * self.last_spinner_length}\r", end='', flush=True)
+            self.last_spinner_length = 0
     
     def _spin(self):
-        """Spinner animation loop"""
+        """Spinner animation loop with better formatting"""
         while self.is_spinning:
-            spinner_char = next(self.spinner_chars)
-            print(f"\r{spinner_char} {self.current_message}...", end='', flush=True)
-            time.sleep(0.1)
+            try:
+                spinner_char = next(self.spinner_chars)
+                spinner_text = f"\r{spinner_char} {self.current_message}..."
+                self.last_spinner_length = len(spinner_text)
+                print(spinner_text, end='', flush=True)
+                time.sleep(0.15)  # Slightly slower for better readability
+            except:
+                break
 
 
 class QChatInteractiveSession:
@@ -103,16 +111,22 @@ class QChatInteractiveSession:
             print(f"[WARNING] Output reader error: {e}")
     
     def _clean_line(self, line):
-        """Clean ANSI escape sequences and spinner characters"""
+        """Clean ANSI escape sequences and unwanted characters"""
+        import re
         # Remove ANSI escape sequences
-        # line = re.sub(r'\x1b\[[0-9;]*m', '', line)
-        # line = re.sub(r'\x1b\[[0-9]*[A-Za-z]', '', line)
+        line = re.sub(r'\x1b\[[0-9;]*[mK]', '', line)
+        line = re.sub(r'\x1b\[[0-9]*[A-Za-z]', '', line)
         # Remove spinner characters
         line = re.sub(r'[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]', '', line)
+        # Remove carriage returns
+        line = re.sub(r'\r+', '', line)
         return line.strip()
     
     def _is_system_message(self, line):
         """Check if line is a system message to filter out"""
+        if not line or len(line.strip()) < 3:
+            return True
+            
         system_patterns = [
             r'✓.*initialized',
             r'⚠.*warning',
@@ -121,6 +135,9 @@ class QChatInteractiveSession:
             r'You are chatting with',
             r'To exit the CLI',
             r'ctrl-c to start chatting',
+            r'mcp servers initialized',
+            r'^\s*$',  # Empty lines
+            r'^\s*\.\s*$',  # Just dots
         ]
         
         for pattern in system_patterns:
@@ -134,23 +151,24 @@ class QChatInteractiveSession:
             r'^Thinking\.\.\.$',
             r'^Thinking\s*$',
             r'^\s*Thinking\s*\.\.\.\s*$',
-            r'^\s*🤔\s*Thinking\s*$'
+            r'^\s*🤔\s*Thinking\s*$',
+            r'^\s*Thinking\s*\.\s*$'
         ]
         
         for pattern in thinking_patterns:
-            if re.search(pattern, line, re.IGNORECASE):
+            if re.search(pattern, line.strip(), re.IGNORECASE):
                 return True
         return False
     
     def ask_question_interactive(self, question: str):
         """
-        Ask question with real-time interactive output and spinner for thinking
+        Ask question with improved real-time interactive output
         """
         if not self.is_active or not self.process:
             raise Exception("Session not active")
         
-        print(f"[INFO] 💭 Processing question: {question[:200]}...")
-        print("[INFO] 🔄 Sending question to Amazon Q...")
+        print(f"[INFO] 💭 Processing question...")
+        print(f"[INFO] 🔄 Sending to Amazon Q...")
         
         try:
             # Send question
@@ -164,12 +182,12 @@ class QChatInteractiveSession:
             )
             auto_response_thread.start()
             
-            # Read responses with timeout
+            # Read responses with improved handling
             response_started = False
             no_output_count = 0
-            max_no_output = 100  # 10 seconds of no output
-            thinking_count = 0
-            consecutive_thinking = 0
+            max_no_output = 150  # 15 seconds of no output
+            thinking_active = False
+            content_lines = 0
             
             while self.is_active:
                 try:
@@ -184,42 +202,45 @@ class QChatInteractiveSession:
                     
                     # Handle thinking messages with spinner
                     if self._is_thinking_message(cleaned_line):
-                        thinking_count += 1
-                        consecutive_thinking += 1
-                        
-                        # Start spinner on first thinking message
-                        if consecutive_thinking == 1:
-                            self.spinner.start("🤔 Amazon Q is thinking")
-                        
-                        # Don't output the thinking message, let spinner handle it
+                        if not thinking_active:
+                            self.spinner.start("🤔 Amazon Q is analyzing")
+                            thinking_active = True
                         continue
                     else:
                         # Stop spinner when we get actual content
-                        if consecutive_thinking > 0:
+                        if thinking_active:
                             self.spinner.stop()
-                            consecutive_thinking = 0
+                            thinking_active = False
+                            print("[INFO] ✨ Generating response...")
 
                     # Detect start of actual response
-                    if not response_started and len(cleaned_line) > 10:
+                    if not response_started and len(cleaned_line) > 5:
                         response_started = True
-                        print("[INFO] 📝 Receiving response...")
+                        print("[INFO] 📝 Receiving response...\n")
 
-                    yield cleaned_line
+                    # Yield actual content
+                    if response_started and cleaned_line:
+                        content_lines += 1
+                        print(cleaned_line)
+                        yield cleaned_line
                         
                 except queue.Empty:
                     no_output_count += 1
                     if no_output_count > max_no_output:
                         # Stop spinner before finishing
-                        self.spinner.stop()
-                        print("[INFO] ⏰ No more output detected, finishing...")
+                        if thinking_active:
+                            self.spinner.stop()
+                        print(f"\n[INFO] ⏰ Response complete ({content_lines} lines)")
                         break
                     continue
             
             # Ensure spinner is stopped
-            self.spinner.stop()
+            if thinking_active:
+                self.spinner.stop()
                     
         except Exception as e:
-            self.spinner.stop()
+            if thinking_active:
+                self.spinner.stop()
             print(f"[ERROR] ❌ Interactive question failed: {e}")
             raise e
     
