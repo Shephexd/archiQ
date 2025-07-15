@@ -99,7 +99,7 @@ chmod +x *.sh
 ### 기본 실행
 ```bash
 # 메인 ArchiQ 실행
-./run_archiq.sh
+./run.sh
 
 # 또는 Python으로 직접 실행
 python src/cli.py
