@@ -1,13 +1,23 @@
-# ArchiQ - AWS 아키텍처 리뷰 도구
+# ArchiQ - AWS 아키텍처 리뷰 도구 / AWS Architecture Review Tool
 
-ArchiQ는 Amazon Q Developer와 통합되어 고객의 현재 AWS 아키텍처를 자동으로 분석하고 개선 방안을 제시하는 도구입니다. 서울 리전 최적화 및 간소화된 사용자 경험을 제공합니다.
+ArchiQ는 Amazon Q Developer와 통합되어 고객의 현재 AWS 아키텍처를 자동으로 분석하고 개선 방안을 제시하는 도구입니다. 서울 리전 최적화 및 간소화된 사용자 경험을 제공하며, **한국어와 영어를 모두 지원**합니다.
 
-## 🚀 주요 기능
+ArchiQ is a tool integrated with Amazon Q Developer that automatically analyzes customers' current AWS architecture and provides improvement recommendations. It offers Seoul region optimization and simplified user experience, **supporting both Korean and English languages**.
 
-### 1. Service Screener 결과 기반 Well-Architected Review
-- 특정 디렉토리의 Service Screener 결과 파일을 분석
-- Well-Architected Framework 6개 기둥 기반 종합 평가
-- 우선순위별 개선 권장사항 제시
+## 🌐 언어 지원 / Language Support
+
+- **한국어 (Korean)**: 기본 지원, 한국어 프롬프트 및 UI
+- **English**: Full English support with localized prompts and interface
+- **언어 전환**: 실행 시 언어 선택 가능, 메뉴에서 언어 변경 옵션 제공
+- **Language Switching**: Language selection at startup, language change option in menu
+
+## 🚀 주요 기능 / Key Features
+
+### 1. AWS 리소스 기반 현대화 경로 분석
+- 현재 운영 중인 AWS 리소스 기반 현대화 기회 식별
+- Well-Architected Framework 6개 기둥 적용한 포괄적 분석
+- 단계별 현대화 로드맵 및 비용 효과 분석 제시
+- 실제 리소스 ID와 설정값을 활용한 구체적 권장사항
 
 ### 2. AWS 리소스 기반 보안 점검
 - 실제 AWS 리소스를 스캔하여 보안 위험 요소 식별
@@ -24,6 +34,11 @@ ArchiQ는 Amazon Q Developer와 통합되어 고객의 현재 AWS 아키텍처�
 - Mermaid 및 draw.io 호환 형식 제공
 - 다중 레벨 다이어그램 (High-Level, Network-Level, Service-Level)
 
+### 5. Service Screener 결과 기반 Well-Architected Review
+- 특정 디렉토리의 Service Screener 결과 파일을 분석
+- Well-Architected Framework 6개 기둥 기반 종합 평가
+- 우선순위별 개선 권장사항 제시
+
 ## 🔧 핵심 기술 특징
 
 ### Hanging 문제 해결
@@ -36,21 +51,36 @@ ArchiQ는 Amazon Q Developer와 통합되어 고객의 현재 AWS 아키텍처�
 ```
 /home/ec2-user/archiQ
 ├── src/
-│   ├── cli.py                    # 🎯 ArchiQ 메인 CLI 인터페이스
+│   ├── cli.py                    # 🎯 ArchiQ 메인 CLI 인터페이스 (다국어 지원)
 │   ├── middleware/               # Amazon Q Developer 통합 레이어
 │   │   └── amazon_q_hook.py     # 🔧 간소화된 Interactive Session 핸들러
 │   └── prompt/                   # 🎨 기능별 프롬프트 템플릿
+│       ├── modernization_path.md
 │       ├── service_screener_review.md
 │       ├── security_check.md
 │       ├── well_architected_review.md
-│       └── architecture_diagram.md
+│       ├── architecture_diagram.md
+│       └── en/                   # 🌐 영어 프롬프트 템플릿
+│           ├── modernization_path.md
+│           ├── service_screener_review.md
+│           ├── security_check.md
+│           ├── well_architected_review.md
+│           └── architecture_diagram.md
 ├── output/                       # 📊 생성된 HTML 보고서 저장소
+│   ├── modernization/            # 현대화 경로 분석 결과
 │   ├── service-screener/         # Service Screener 분석 결과
 │   ├── security/                 # 보안 점검 결과
 │   ├── well-architected/         # Well-Architected 리뷰 결과
-│   └── architecture/             # 아키텍처 다이어그램 결과
+│   ├── architecture/             # 아키텍처 다이어그램 결과
+│   └── en/                       # 🌐 영어 보고서 저장소
+│       ├── modernization/
+│       ├── service-screener/
+│       ├── security/
+│       ├── well-architected/
+│       └── architecture/
 ├── requirements.txt              # Python 의존성
 ├── run_archiq.sh                # 🚀 메인 실행 스크립트
+├── run_modernization_path.sh    # 현대화 경로 분석 실행 스크립트
 ├── run_service_screener.sh      # Service Screener 실행 스크립트
 ├── run_security_check.sh        # 보안 점검 실행 스크립트
 ├── run_well_architected.sh      # Well-Architected 리뷰 실행 스크립트
@@ -98,36 +128,41 @@ chmod +x *.sh
 
 ### 기본 실행
 ```bash
-# 메인 ArchiQ 실행
+# 메인 ArchiQ 실행 (언어 선택 포함)
 ./run_archiq.sh
 
 # 또는 Python으로 직접 실행
 python src/cli.py
 ```
 
-### 개별 기능 실행
-```bash
-# Service Screener 결과 기반 Well-Architected Review
-./run_service_screener.sh
+### 언어 선택 / Language Selection
+프로그램 시작 시 언어를 선택할 수 있습니다:
+- **한국어 (Korean)**: 한국어 인터페이스 및 프롬프트 사용
+- **English**: English interface and prompts
+- 실행 중 언어 변경 옵션도 메뉴에서 제공됩니다
 
-# AWS 리소스 기반 보안 점검
-./run_security_check.sh
-
-# AWS 리소스 기반 Well-Architected 리뷰
-./run_well_architected.sh
-
-# AWS 리소스 기반 아키텍처 다이어그램 생성
-./run_architecture_diagram.sh
-```
-
-### CLI 메뉴 옵션
+### CLI 메뉴 옵션 (한국어)
 ```
 ArchiQ - AWS 아키텍처 리뷰 도구를 선택하세요:
-  1. Service Screener 결과 기반 Well-Architected Review
-  2. AWS 리소스 기반 보안 점검  
-  3. AWS 리소스 기반 Well-Architected 리뷰
-  4. AWS 리소스 기반 아키텍처 다이어그램 생성
-  5. 종료
+  1. 사용중인 AWS 리소스 기반 현대화 경로 분석
+  2. 사용중인 AWS 리소스 기반 보안 점검
+  3. 사용중인 AWS 리소스 기반 Well-Architected 리뷰
+  4. 사용중인 AWS 리소스 기반 아키텍처 다이어그램 생성
+  5. Service Screener 결과 기반 Well-Architected Review
+  6. 언어 변경 (Change Language)
+  7. 종료
+```
+
+### CLI Menu Options (English)
+```
+ArchiQ - AWS Architecture Review Tool:
+  1. AWS Resource-based Modernization Path Analysis
+  2. AWS Resource-based Security Assessment
+  3. AWS Resource-based Well-Architected Review
+  4. AWS Resource-based Architecture Diagram Generation
+  5. Service Screener Results-based Well-Architected Review
+  6. 언어 변경 (Change Language)
+  7. Exit
 ```
 
 ## 📊 생성되는 보고서
@@ -151,6 +186,7 @@ ArchiQ - AWS 아키텍처 리뷰 도구를 선택하세요:
 ### 프롬프트 커스터마이징
 `src/prompt/` 디렉토리의 Markdown 파일을 수정하여 분석 기준을 조정할 수 있습니다:
 
+- `modernization_path.md`: 현대화 경로 분석 프롬프트
 - `service_screener_review.md`: Service Screener 분석 프롬프트
 - `security_check.md`: 보안 점검 프롬프트  
 - `well_architected_review.md`: Well-Architected 리뷰 프롬프트
