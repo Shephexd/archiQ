@@ -62,6 +62,7 @@ ArchiQ is a tool integrated with Amazon Q Developer that automatically analyzes 
 │       ├── architecture_diagram.md
 │       └── en/                   # 🌐 영어 프롬프트 템플릿
 │           ├── modernization_path.md
+
 │           ├── service_screener_review.md
 │           ├── security_check.md
 │           ├── well_architected_review.md
@@ -128,8 +129,8 @@ chmod +x *.sh
 
 ### 기본 실행
 ```bash
-# 메인 ArchiQ 실행 (언어 선택 포함)
-./run_archiq.sh
+# 메인 ArchiQ 실행
+./run.sh
 
 # 또는 Python으로 직접 실행
 python src/cli.py
